@@ -61,14 +61,12 @@ plt.rcParams.update({
 # ==============================================================================
 @st.cache_data
 def load_and_clean_embedded_data():
-    # Synthetic generator reproducing your exact dataset framework seamlessly 
     np.random.seed(42)
     n_samples = 1200
     
     dates = pd.date_range(start="2025-01-01", periods=180, freq="D")
     chosen_dates = np.random.choice(dates, n_samples)
     
-    # Matching exact dataset column schemas from your analytics blocks
     data = {
         'order_id': [f"ORD-{1000 + i}" for i in range(n_samples)],
         'customer_id': [f"CUST-{np.random.randint(1, 350)}" for _ in range(n_samples)],
@@ -85,14 +83,12 @@ def load_and_clean_embedded_data():
     
     raw_df = pd.DataFrame(data)
     
-    # Back-calculating dependent transactional logic cells
     raw_df['total_amount'] = (raw_df['quantity'] * raw_df['price']) * (1 - raw_df['discount'] / 100)
     raw_df['profit'] = raw_df['total_amount'] * np.random.uniform(0.15, 0.45, n_samples)
     raw_df['loss'] = np.where(raw_df['rating'] <= 2, raw_df['total_amount'] * 0.1, 0)
     raw_df['calculated_total_amount'] = raw_df['total_amount']
     raw_df['profit_margin'] = (raw_df['profit'] / raw_df['total_amount']) * 100
     
-    # Data pipeline processing definitions
     raw_df.columns = raw_df.columns.str.lower().str.strip()
     cleaned_df = raw_df.copy()
     
@@ -104,18 +100,15 @@ def load_and_clean_embedded_data():
     
     return raw_df, cleaned_df, outliers_removed
 
-# Load from embedded engine block directly
 df_raw, df_clean, metrics_dropped = load_and_clean_embedded_data()
 numeric_columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
 
-# Mapping configs for visual outputs
 col_mapping = {
     'order': 'order_id', 'customer': 'customer_id', 'restaurant': 'restaurant_id',
     'revenue': 'total_amount', 'profit': 'profit', 'loss': 'loss',
     'rating': 'rating', 'discount': 'discount', 'quantity': 'quantity', 'date': 'order_date'
 }
 
-# Sidebar Info Box
 st.sidebar.title("🎛️ Control Panel")
 st.sidebar.markdown("---")
 st.sidebar.success("⚡ Data Engine: Running on Integrated Embedded CSV Database.")
@@ -206,13 +199,16 @@ with tab_audit:
         st.dataframe(null_summary.round(2), width="stretch")
 
 # --------------------------------------------------------------------------
-# TAB 3: TREND VISUALIZATION
+# TAB 3: TREND VISUALIZATION (FIXED PIPELINE VIA PERIODS)
 # --------------------------------------------------------------------------
 with tab_eda:
     st.markdown('<h3 class="section-header">📉 Distribution Profiles & Feature Intersections</h3>', unsafe_allow_html=True)
     
     st.markdown("#### Rolling Performance Curves (Revenue vs Gross Profit)")
-    monthly_sales = df_clean.set_index('order_date').groupby(pd.Grouper(freq='M')).agg({'total_amount': 'sum', 'profit': 'sum'})
+    
+    # FIX: Explicitly convert to datetime and perform grouping via PeriodIndex to avoid pd.Grouper version crashes
+    df_clean['order_date'] = pd.to_datetime(df_clean['order_date'])
+    monthly_sales = df_clean.groupby(df_clean['order_date'].dt.to_period('M')).agg({'total_amount': 'sum', 'profit': 'sum'})
     
     fig_time, ax_time = plt.subplots(figsize=(14, 4))
     ax_time.plot(monthly_sales.index.strftime('%b %Y'), monthly_sales['total_amount'], label='Monthly Revenue', marker='o', linewidth=2)
